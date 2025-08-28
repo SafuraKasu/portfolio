@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Safura Kasu Portfolio</title>
+    <!-- OCR-A Font Import -->
+    <link rel="stylesheet" href="https://fonts.cdnfonts.com/css/ocr-a">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #000;
+            color: #00ff41;
+            font-family: 'OCR A', monospace;
+            overflow-x: hidden;
+            min-height: 100vh;
+        }
+
+        #matrixCanvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            pointer-events: none;
+            opacity: 0; /* Start hidden until boot sequence completes */
+            transition: opacity 1s ease;
+        }
+
+        #matrixCanvas.visible {
+            opacity: 0.8;
+        }
+
+        /* Terminal Boot Screen */
+        .boot-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 100;
+            background: #000;
+            color: #00ff41;
+            font-family: 'OCR A', monospace;
+            font-size: 0.875rem;
+            padding: 2rem;
+            cursor: pointer;
+            transition: opacity 0.5s ease;
+        }
+
+        .boot-screen.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .terminal-prompt {
+            position: relative;
+        }
+
+        .terminal-line {
+            margin-bottom: 0.5rem;
+            opacity: 0;
+        }
+
+        .terminal-line.typing {
+            opacity: 1;
+        }
+
+        .terminal-line:nth-child(1) { }
+        .terminal-line:nth-child(2) { }
+
+        .cursor-blink {
+            animation: blink 1s infinite;
+            margin-left: 0px;
+        }
+
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0; }
+        }
+
+        /* Nav hidden initially for home page unlock effect */
+        .nav {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 50;
+            padding: 1.5rem;
+            display: flex;
+            justify-content: center;
+            gap: 1.5rem;
+            flex-wrap: wrap;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 1s ease;
+        }
+        .nav.visible {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .nav-item {
+            padding: 0.5rem 1rem;
+            border: 1px solid #00ff41;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(10px);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 0.875rem;
+            letter-spacing: 0.1em;
+            min-width: 80px;
+            text-align: center;
+        }
+        .nav-item:hover {
+            background: rgba(0, 255, 65, 0.2);
+            box-shadow: 0 0 20px rgba(0, 255, 65, 0.3);
+        }
+        .nav-item.active {
+            background: rgba(0, 255, 65, 0.3);
+        }
+
+        /* Main content hidden at start for home page */
+        .main-content {
+            position: relative;
+            z-index: 10;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+            padding-top: 120px;
+            width: 100vw;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 1s ease;
+        }
+        .main-content.visible {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        /* Home page styles */
+        .hero {
+            text-align: center;
+            max-width: 900px;
+            margin: auto;
+        }
+        .hero h1 {
+            font-size: clamp(2rem, 8vw, 5rem);
+            margin-bottom: 1rem;
+            letter-spacing: 0.1em;
+        }
+        .hero .subtitle {
+            font-size: clamp(0.875rem, 3vw, 1.25rem);
+            margin-bottom: 3rem;
+            color: #00cc33;
+        }
+        .hero .description {
+            border: 1px solid #00ff41;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(10px);
+            padding: 2rem;
+            color: #00cc33;
+        }
+
+        /* Keep quantum text from "floating out of the box" */
+        .hero h1 span, .hero .subtitle span, .hero .description span {
+            display: inline-block;
+            white-space: pre;
+        }
+
+        /* Other pages styles */
+        .content-section {
+            display: none;
+            max-width: 1200px;
+            width: 100%;
+            margin: 0 auto;
+        }
+        .content-section.active {
+            display: block;
+        }
+        .section-title {
+            font-size: clamp(1.5rem, 5vw, 2.5rem);
+            text-align: center;
+            margin-bottom: 2rem;
+            letter-spacing: 0.1em;
+        }
+        .grid {
+            display: grid;
+            gap: 2rem;
+        }
+        .grid-2 {
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        }
+        .grid-3 {
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        }
+        .card {
+            border: 1px solid #00ff41;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(10px);
+            padding: 1.5rem;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        .card:hover {
+            background: rgba(0, 0, 0, 0.9);
+            box-shadow: 0 10px 30px rgba(0, 255, 65, 0.2);
+            transform: translateY(-5px);
+        }
+        .card h3 {
+            color: #00ff41;
+            font-size: 1.125rem;
+            margin-bottom: 1rem;
+            letter-spacing: 0.05em;
+        }
+        .card p {
+            color: #00cc33;
+            font-size: 0.875rem;
+            line-height: 1.5;
+            margin-bottom: 1rem;
+        }
+        .card .tech {
+            color: #00ff41;
+            font-size: 0.75rem;
+            letter-spacing: 0.05em;
+        }
+
+        .footer {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            z-index: 40;
+            padding: 1rem;
+            text-align: center;
+            font-size: 0.75rem;
+            color: #006600;
+            letter-spacing: 0.1em;
+        }
+
+        .contact-info {
+            border: 1px solid #00ff41;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(10px);
+            padding: 2rem;
+            max-width: 500px;
+            margin: 0 auto;
+            text-align: center;
+        }
+        .contact-info h2 {
+            font-size: 2rem;
+            margin-bottom: 2rem;
+            letter-spacing: 0.1em;
+        }
+        .contact-info p {
+            margin-bottom: 1rem;
+            color: #00cc33;
+        }
+        .contact-links {
+            border-top: 1px solid #00ff41;
+            margin-top: 1.5rem;
+            padding-top: 1.5rem;
+        }
+
+        .binary {
+            /* keep a gentle flicker only for the intro text spans (not background) */
+            animation: flicker 0.5s infinite;
+            font-family: 'OCR A', monospace !important;
+            font-size: 1em;
+            letter-spacing: 0.05em;
+        }
+        @keyframes flicker {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0.7; }
+        }
+
+        .research-section {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                padding: 1rem;
+                padding-top: 100px;
+            }
+            .hero {
+                padding: 0;
+            }
+            .nav {
+                padding: 1rem;
+                gap: 0.5rem;
+            }
+            .nav-item {
+                padding: 0.5rem;
+                font-size: 0.75rem;
+                min-width: 60px;
+            }
+            .hero .description {
+                padding: 1.5rem;
+                font-size: 0.875rem;
+            }
+            .boot-screen {
+                font-size: 0.75rem;
+                padding: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Boot Screen -->
+    <div class="boot-screen" id="bootScreen">
+        <div class="terminal-prompt">
+            <div class="terminal-line" id="terminalLine1"></div>
+            <div class="terminal-line" id="terminalLine2"></div>
+        </div>
+    </div>
+
+    <!-- Matrix Rain Canvas -->
+    <canvas id="matrixCanvas"></canvas>
+
+    <!-- Navigation (hidden at first) -->
+    <nav class="nav">
+        <div class="nav-item active" data-section="home">Home</div>
+        <div class="nav-item" data-section="about">About</div>
+        <div class="nav-item" data-section="projects">Projects</div>
+        <div class="nav-item" data-section="research">Research</div>
+        <div class="nav-item" data-section="contact">Contact</div>
+    </nav>
+
+    <!-- Main Content (hidden at first) -->
+    <main class="main-content">
+        <!-- Home Section -->
+        <div id="home" class="content-section active">
+            <div class="hero">
+                <h1 id="mainName">SAFURA KASU</h1>
+                <p id="subtitle" class="subtitle">Quantum Computing • Artificial Intelligence • Data Science</p>
+                <div class="description">
+                    <p id="description">
+                        Motivated BSc student in Data Science and AI with 4.0 cGPA, seeking to apply quantum algorithms and machine learning to solve real-world challenges through innovative, data-driven solutions.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- About Section -->
+        <div id="about" class="content-section">
+            <h2 class="section-title">ABOUT.EXE</h2>
+            <div class="grid grid-2">
+                <div class="card">
+                    <h3>QUANTUM_PROFILE.DAT</h3>
+                    <div>
+                        <p>► BSc Data Science & AI Student at UDST Qatar</p>
+                        <p>► Perfect 4.0 cGPA academic excellence</p>
+                        <p>► Quantum computing researcher & Qiskit developer</p>
+                        <p>► NASA-affiliated astronomical data analyst</p>
+                        <p>► Youth Ambassador for career & wellness programs</p>
+                    </div>
+                </div>
+                <div class="card">
+                    <h3>SKILLS.QBT</h3>
+                    <div>
+                        <p>► Python | Java | SQL | HTML/CSS</p>
+                        <p>► Qiskit | Pandas | NumPy | Matplotlib</p>
+                        <p>► Scikit-Learn | Streamlit | MongoDB</p>
+                        <p>► GitHub | Jupyter | Kaggle | VS Code</p>
+                        <p>► IELTS: 8.5/9.0 English Proficiency</p>
+                    </div>
+                </div>
+            </div>
+            <div class="grid" style="margin-top: 2rem;">
+                <div class="card">
+                    <h3>EDUCATION.EDU</h3>
+                    <div>
+                        <p><strong>University of Doha for Science and Technology</strong> | 2024 - 2027</p>
+                        <p>BSc Data Science and Artificial Intelligence | cGPA: 4.00/4.00</p>
+                        <p style="margin-top: 1rem;"><strong>M.E.S. Indian School, Qatar</strong> | Graduated 2023</p>
+                        <p>High School Diploma with Excellence</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Projects Section -->
+        <div id="projects" class="content-section">
+            <h2 class="section-title">PROJECTS.QSM</h2>
+            <div class="grid grid-3">
+                <div class="card">
+                    <h3>Anomaly Detector for CSV</h3>
+                    <p>Streamlit web application for identifying anomalies in CSV datasets with multiple detection methods for outliers and missing data. Includes column-level heuristics with contextual suggestions.</p>
+                    <div class="tech">Tech: Streamlit, Python, Pandas</div>
+                </div>
+                <div class="card">
+                    <h3>Quantum IDE for Beginners</h3>
+                    <p>Educational web app helping beginners learn quantum computing basics through interactive interface. Features live circuit visualization and Bloch sphere representations.</p>
+                    <div class="tech">Tech: Streamlit, Qiskit, Python</div>
+                </div>
+                <div class="card">
+                    <h3>NASA Astronomical Analysis</h3>
+                    <p>Analyzed astronomical data for near-earth object detection as part of NASA Affiliated International Astronomical Search Collaboration, emphasizing precision and problem-solving.</p>
+                    <div class="tech">Tech: Python, Data Analysis, Astronomy</div>
+                </div>
+                <div class="card">
+                    <h3>Qatar Tech Innovation</h3>
+                    <p>Competed in Qatar Technological Innovation Program, achieving top 15 placement among 150+ participating teams with innovative tech solution.</p>
+                    <div class="tech">Tech: Innovation, Problem-Solving</div>
+                </div>
+                <div class="card">
+                    <h3>Youth Wellness Research</h3>
+                    <p>Led research on youth career choices and emotional wellness trends as Youth Ambassador for Lifology, creating comprehensive reports and outreach campaigns.</p>
+                    <div class="tech">Tech: Research, Data Analysis, Reporting</div>
+                </div>
+                <div class="card">
+                    <h3>Freelance Data Projects</h3>
+                    <p>Developing portfolio of data analysis and machine learning projects on Fiverr, building hands-on experience through client-focused data solutions.</p>
+                    <div class="tech">Tech: ML, Data Analysis, Client Work</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Research Section -->
+        <div id="research" class="content-section">
+            <h2 class="section-title">RESEARCH.QPY</h2>
+            <div class="research-section">
+                <div class="grid">
+                    <div class="card">
+                        <h3>Quantum Entanglement & Hawking Radiation</h3>
+                        <p>Currently investigating quantum entanglement in relation to Hawking radiation and black holes. Synthesizing complex theoretical insights into accessible reports with expert feedback.</p>
+                        <div class="tech">Status: In Progress | Focus: Quantum Physics & Black Holes</div>
+                    </div>
+                    <div class="card">
+                        <h3>NASA Astronomical Search Collaboration</h3>
+                        <p>Participated in NASA Affiliated International Astronomical Search Collaboration (2021), analyzing astronomical data for near-earth object detection with emphasis on precision and advanced problem-solving.</p>
+                        <div class="tech">Status: Completed 2021 | Collaboration: NASA Affiliated Program</div>
+                    </div>
+                    <div class="card">
+                        <h3>Qiskit Global Summer School 2025</h3>
+                        <p>Selected for IBM's prestigious quantum computing training program for quantum computing beginners, advancing knowledge in quantum algorithms, circuits, and applications.</p>
+                        <div class="tech">Status: 2025 Participant | Institution: IBM Quantum Education</div>
+                    </div>
+                    <div class="card">
+                        <h3>WOMANIUM & WISER Program</h3>
+                        <p>Participating in program aimed at solving real-world problems through PDEs and quantum computing applications, focusing on practical quantum solutions.</p>
+                        <div class="tech">Status: Active Participant | Focus: Quantum Applications</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Contact Section -->
+        <div id="contact" class="content-section">
+            <div class="contact-info">
+                <h2>CONTACT.NET</h2>
+                <p style="font-size: 1.125rem; margin-bottom: 2rem;">Ready to collapse the wavefunction of collaboration?</p>
+                <div style="display: grid; gap: 1rem;">
+                    <p>📧 safurakasu [at] gmail.com</p>
+                    <p>🔗 https://www.linkedin.com/in/safura-kasu-544b50281/</p>
+                    <p>💻 https://github.com/SafuraKasu</p>
+                    <p>🎓 University of Doha for Science & Technology</p>
+                    <p>🌍 Doha, Qatar</p>
+                </div>
+                <div class="contact-links">
+                    <p style="font-size: 0.75rem; color: #00ff41;">
+                        "In the quantum realm, every interaction creates infinite possibilities."
+                    </p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <p>QUANTUM_STATE: |ψ⟩ = α|0⟩ + β|1⟩ | REALITY.VERSION: 2025.8.18</p>
+    </footer>
+
+    <script>
+        // =========================
+        // Matrix Rain (with live glow on hover - FIXED)
+        // =========================
+        const canvas = document.getElementById('matrixCanvas');
+        const ctx = canvas.getContext('2d');
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        resizeCanvas();
+        window.addEventListener('resize', () => {
+            resizeCanvas();
+            columns = Math.ceil(canvas.width / fontSize) - 1;
+            drops = Array(columns).fill(1);
+            glowIntensity = Array(columns).fill(0);
+        });
+
+        const chars = '01';
+        const fontSize = 16;
+        let columns = Math.floor(canvas.width / fontSize);
+        let drops = Array(columns).fill(1);
+
+        // live cursor position
+        let mouseX = -10000, mouseY = -10000;
+        document.addEventListener("mousemove", (e) => {
+            mouseX = e.clientX;
+            mouseY = e.clientY;
+        });
+
+        // Per-column glow memory for a smooth trail (no harsh flicker)
+        let glowIntensity = Array(columns).fill(0);
+
+        function draw() {
+            // subtle motion blur for trails (low alpha)
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.07)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // use a consistent base font
+            ctx.font = fontSize + "px 'OCR A', monospace";
+
+            for (let i = 0; i < drops.length; i++) {
+                const text = chars[Math.floor(Math.random() * chars.length)];
+                const x = i * fontSize;
+                const y = drops[i] * fontSize;
+
+                // FIXED: Ensure x and y are within canvas bounds before distance calculation
+                if (x >= 0 && x <= canvas.width && y >= 0 && y <= canvas.height) {
+                    // distance to cursor
+                    const dx = x - mouseX;
+                    const dy = y - mouseY;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+
+                    // boost glow when cursor is near this glyph
+                    const radius = 100;
+                    if (dist < radius) {
+                        const localBoost = 0.5 * (1 - dist / radius); // 0..0.5
+                        glowIntensity[i] = Math.min(1, glowIntensity[i] + localBoost);
+                    }
+                }
+
+                // natural fade of glow (prevents constant flicker)
+                glowIntensity[i] = Math.max(0, glowIntensity[i] - 0.03);
+
+                // FIXED: Clamp glow intensity and add bounds checking
+                const clampedGlow = Math.max(0, Math.min(1, glowIntensity[i]));
+                
+                // color mapping based on intensity (no size change)
+                const baseGreen = 0x33; // 51
+                const extraGreen = Math.floor(clampedGlow * 170); // up to +170
+                const g = Math.min(255, Math.max(0, baseGreen + extraGreen)); // Double clamp for safety
+                ctx.fillStyle = `rgb(0, ${g}, ${baseGreen})`;
+
+                // subtle shadow only when glowing
+                if (clampedGlow > 0.1) {
+                    ctx.shadowColor = `rgba(0, 255, 100, ${clampedGlow * 0.7})`;
+                    ctx.shadowBlur = Math.max(0, Math.min(20, 12 * clampedGlow)); // Clamp blur value
+                } else {
+                    ctx.shadowBlur = 0;
+                    ctx.shadowColor = 'transparent';
+                }
+
+                ctx.fillText(text, x, y);
+
+                // reset drop randomly at bottom
+                if (y > canvas.height && Math.random() > 0.985) {
+                    drops[i] = 0;
+                }
+                drops[i]++;
+            }
+            
+            // Reset shadow after each frame to prevent accumulation
+            ctx.shadowBlur = 0;
+            ctx.shadowColor = 'transparent';
+        }
+
+        let matrixInterval;
+
+        // =========================
+        // Boot Sequence & Matrix Initialization
+        // =========================
+        const bootScreen = document.getElementById('bootScreen');
+        const nav = document.querySelector(".nav");
+        const main = document.querySelector(".main-content");
+        let introPlayed = false;
+
+        // Terminal typewriter effect
+        function typeText(element, text, speed = 80, callback) {
+            element.classList.add('typing');
+            let i = 0;
+            const timer = setInterval(() => {
+                if (i < text.length) {
+                    element.textContent += text.charAt(i);
+                    i++;
+                } else {
+                    clearInterval(timer);
+                    if (callback) callback();
+                }
+            }, speed);
+        }
+
+        // Start boot sequence immediately
+        window.addEventListener('load', () => {
+            const line1 = document.getElementById('terminalLine1');
+            const line2 = document.getElementById('terminalLine2');
+            
+            // Type first line
+            setTimeout(() => {
+                typeText(line1, '> click anywhere to collapse superposition to reality.', 60, () => {
+                    // Type second line after first is complete
+                    setTimeout(() => {
+                        typeText(line2, '> awaiting user input...', 60, () => {
+                            // Add blinking cursor after typing is complete
+                            const cursor = document.createElement('span');
+                            cursor.className = 'cursor-blink';
+                            cursor.textContent = '█';
+                            line2.appendChild(cursor);
+                        });
+                    }, 300);
+                });
+            }, 500);
+        });
+
+        // Boot screen click handler
+        bootScreen.addEventListener("click", () => {
+            if (!introPlayed) {
+                introPlayed = true;
+                
+                // Hide boot screen
+                bootScreen.classList.add("hidden");
+                
+                // Show matrix rain and other elements
+                setTimeout(() => {
+                    canvas.classList.add("visible");
+                    nav.classList.add("visible");
+                    main.classList.add("visible");
+                    
+                    // Start matrix animation
+                    matrixInterval = setInterval(draw, 60);
+                    
+                    // Start quantum text effects
+                    setTimeout(() => {
+                        createQuantumText(document.getElementById('mainName'), 'SAFURA KASU', 200);
+                        createQuantumText(document.getElementById('subtitle'), 'Quantum Computing • Artificial Intelligence • Data Science', 800);
+                        createQuantumText(document.getElementById('description'), 'Motivated BSc student in Data Science and AI with 4.0 cGPA, seeking to apply quantum algorithms and machine learning to solve real-world challenges through innovative, data-driven solutions.', 1400);
+                    }, 300);
+                }, 500);
+            }
+        });
+
+        // =========================
+        // Quantum Text Effect (intro reveal)
+        // =========================
+        function createQuantumText(element, finalText, delay = 0) {
+            const originalText = finalText;
+            element.innerHTML = '';
+
+            // Create binary spans (kept lightweight; not tied to background)
+            for (let i = 0; i < originalText.length; i++) {
+                const span = document.createElement('span');
+                span.className = 'binary';
+                span.textContent = Math.random() > 0.5 ? '1' : '0';
+                element.appendChild(span);
+            }
+
+            // Flicker effect on the text only
+            const flickerInterval = setInterval(() => {
+                const spans = element.querySelectorAll('.binary');
+                spans.forEach(span => {
+                    if (span.className === 'binary') {
+                        span.textContent = Math.random() > 0.5 ? '1' : '0';
+                    }
+                });
+            }, 100);
+
+            // Collapse to real text after delay
+            setTimeout(() => {
+                clearInterval(flickerInterval);
+                let index = 0;
+
+                const revealInterval = setInterval(() => {
+                    if (index < originalText.length) {
+                        const span = element.children[index];
+                        if (span) {
+                            span.textContent = originalText[index];
+                            span.className = '';
+                        }
+                        index++;
+                    } else {
+                        clearInterval(revealInterval);
+                    }
+                }, 80);
+            }, delay);
+        }
+
+        // =========================
+        // Navigation System
+        // =========================
+        const navItems = document.querySelectorAll('.nav-item');
+        const sections = document.querySelectorAll('.content-section');
+
+        // Store original nav text
+        const originalNavTexts = {};
+        navItems.forEach(item => {
+            originalNavTexts[item.getAttribute('data-section')] = item.textContent;
+        });
+
+        // Subtle "superposition" effect for nav labels (only after intro)
+        function createSuperpositionEffect(element, originalText) {
+            element.innerHTML = '';
+            for (let i = 0; i < originalText.length; i++) {
+                const span = document.createElement('span');
+                span.textContent = originalText[i];
+                span.style.opacity = '0.3';
+                span.style.transition = 'opacity 0.3s ease';
+                element.appendChild(span);
+            }
+        }
+
+        navItems.forEach(item => {
+            const sectionKey = item.getAttribute('data-section');
+            const originalText = originalNavTexts[sectionKey];
+
+            // Initialize non-active items with superposition effect when intro is ready
+            const makeInactiveLook = () => {
+                if (!item.classList.contains('active') && introPlayed) {
+                    createSuperpositionEffect(item, originalText);
+                }
+            };
+
+            item.addEventListener('mouseenter', () => {
+                if (!item.classList.contains('active') && introPlayed) {
+                    const spans = item.querySelectorAll('span');
+                    spans.forEach(span => span.style.opacity = '1');
+                }
+            });
+
+            item.addEventListener('mouseleave', () => {
+                if (!item.classList.contains('active') && introPlayed) {
+                    const spans = item.querySelectorAll('span');
+                    spans.forEach(span => span.style.opacity = '0.3');
+                }
+            });
+
+            item.addEventListener('click', () => {
+                if (!introPlayed) return;
+
+                // Update active nav
+                navItems.forEach(n => {
+                    n.classList.remove('active');
+                    const k = n.getAttribute('data-section');
+                    createSuperpositionEffect(n, originalNavTexts[k]);
+                });
+                item.classList.add('active');
+                // fun collapse for the clicked item
+                createQuantumText(item, originalText, 0);
+
+                // Update sections
+                sections.forEach(sec => sec.classList.remove('active'));
+                document.getElementById(sectionKey).classList.add('active');
+
+                // Re-trigger home quantum effect when returning
+                if (sectionKey === 'home') {
+                    setTimeout(() => {
+                        createQuantumText(document.getElementById('mainName'), 'SAFURA KASU', 200);
+                        createQuantumText(document.getElementById('subtitle'), 'Quantum Computing • Artificial Intelligence • Data Science', 800);
+                        createQuantumText(document.getElementById('description'), 'Motivated BSc student in Data Science and AI with 4.0 cGPA, seeking to apply quantum algorithms and machine learning to solve real-world challenges through innovative, data-driven solutions.', 1400);
+                    }, 300);
+                }
+            });
+        });
+
+        // After intro appears, render the superposition effect on the rest
+        const navInitInterval = setInterval(() => {
+            if (introPlayed) {
+                navItems.forEach(item => {
+                    if (!item.classList.contains('active')) {
+                        const sectionKey = item.getAttribute('data-section');
+                        createSuperpositionEffect(item, originalNavTexts[sectionKey]);
+                    }
+                });
+                clearInterval(navInitInterval);
+            }
+        }, 200);
+    </script>
+</body>
+</html>
